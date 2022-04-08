@@ -8,18 +8,6 @@
 ;    no:  display an error
 ; loop back to the top
 
-; R0 | System Register, In/Out (Reserved)
-; R1 | Index Offset (Global)
-; R2 | Jump Table Offset (Global)
-; R3 |
-; R4 |
-; R5 |
-; R6 | JSR Save Register (Reserved)
-; R7 | JSR Register (Reserved)
-
-; TRAP x23 -> Waits for console input, loads character into R0
-; TRAP x21 -> Writes character in R0 to console
-
 .ORIG x9000 ; ascii table
 	.FILL x41 ; A
 	.FILL x42 ; B
@@ -107,28 +95,80 @@
 	.FILL xA ; \n
 .END
 
-		.ORIG x3000
-ASCII_TABLE .FILL x9000
-PROMPT_LOC .FILL x9500
-ERROR_LOC .FILL x9600
+.ORIG x3000
 
+; program start
 START	AND R1 R1 #0
 		LEA R2 TABLE
 		LD R3 ASCII_TABLE
 		JSR PROMPT
 		
+; state machine loop
 AGAIN	LD R3 ASCII_TABLE	
 		ADD R7 R2 R1
 		LDR R7 R7 #0
 		JSRR R7
 		BRnzp AGAIN
 
+; data locations
+ASCII_TABLE .FILL x9000
+PROMPT_LOC .FILL x9500
+ERROR_LOC .FILL x9600
 
+; state locations table
+TABLE	.FILL ST_INIT	; S=0
+		.FILL ST_A		; S=1
+		.FILL ST_AD		; S=2
+		.FILL ST_AN		; S=3
+		.FILL ST_ADD	; S=4  0001 #1
+		.FILL ST_AND	; S=5  0101 #5
+		.FILL ST_B		; S=6
+		.FILL ST_BR		; S=7  0000
+		.FILL ST_J		; S=8
+		.FILL ST_JM		; S=9
+		.FILL ST_JS		; S=10
+		.FILL ST_JMP	; S=11 1100
+		.FILL ST_JSR	; S=12 0100
+		.FILL ST_JSRR	; S=13 0100
+		.FILL ST_L		; S=14
+		.FILL ST_LD		; S=15 0010
+		.FILL ST_LE		; S=16
+		.FILL ST_LDI	; S=17 1010
+		.FILL ST_LDR	; S=18 0110
+		.FILL ST_LEA	; S=19 1110
+		.FILL ST_N		; S=20
+		.FILL ST_NO		; S=21
+		.FILL ST_NOT	; S=22 1001
+		.FILL ST_R		; S=23
+		.FILL ST_RE		; S=24
+		.FILL ST_RT		; S=25
+		.FILL ST_RET	; S=26 1100
+		.FILL ST_RTI	; S=27 1000
+		.FILL ST_S		; S=28
+		.FILL ST_ST		; S=29 0011
+		.FILL ST_STI	; S=30 1011
+		.FILL ST_STR	; S=31 0111
+		.FILL ST_T		; S=32
+		.FILL ST_TR		; S=33
+		.FILL ST_TRA	; S=34
+		.FILL ST_TRAP	; S=35 1111
+		.FILL ST_Q		; S=36
+		.FILL ST_QU		; S=37
+		.FILL ST_QUI	; S=38
+		.FILL ST_QUIT	; 3=39
+		.FILL ST_FAIL	; S=40
+
+; func(private:R4 reserved:R0) -> CC
+; changes: R4, R7, CC
+; sets CC to Z if R4 == R0
 EQUALS	NOT R4 R4
 		ADD R4 R4 #1
 		ADD R4 R0 R4
 		RET
-		
+
+; func(reserved: R3) -> NULL
+; changes: R0, R4, R5, R6, R7, CC
+; echos instruction prompt to console
 PROMPT	ADD R6 R7 #0
 		LD R5 PROMPT_LOC
 			LDR R0 R5 #0
@@ -142,6 +182,9 @@ PROMPT	ADD R6 R7 #0
 		ADD R7 R6 #0
 		RET
 		
+; func(reserved: R3) -> NULL
+; changes: R0, R4, R5, R6, R7, CC
+; echos error message to console
 FAIL 	ADD R6 R7 #0
 		LD R5 ERROR_LOC
 			LDR R0 R5 #0
@@ -153,7 +196,9 @@ FAIL 	ADD R6 R7 #0
 		ADD R7 R6 #0
 		RET
 		
-		
+; func(reserved: R5) -> NULL
+; changes: R0, R2, R3, R5, R7, CC
+; echos the 4 rightmost bits of R5 to the console
 PRINT	ADD R2 R7 #0
 
 		NOT R5 R5
@@ -213,6 +258,9 @@ PRINT	ADD R2 R7 #0
 		ADD R7 R2 #0
 		RET
 
+; func() -> R0
+; changes: R0, R4, R5, R7, CC
+; gets a character from the console and makes it uppercase, stores character in R0
 INPUT	ADD R4 R7 #0
 		TRAP x20
 		TRAP x21
@@ -230,51 +278,35 @@ INPUT	ADD R4 R7 #0
 			ADD R0 R0 #-2
 		ADD R7 R4 #0
 		RET
-
-
-TABLE		.FILL ST_INIT	; S=0
-			.FILL ST_A		; S=1
-			.FILL ST_AD		; S=2
-			.FILL ST_AN		; S=3
-			.FILL ST_ADD	; S=4  0001 #1
-			.FILL ST_AND	; S=5  0101 #5
-			.FILL ST_B		; S=6
-			.FILL ST_BR		; S=7  0000
-			.FILL ST_J		; S=8
-			.FILL ST_JM		; S=9
-			.FILL ST_JS		; S=10
-			.FILL ST_JMP	; S=11 1100
-			.FILL ST_JSR	; S=12 0100
-			.FILL ST_JSRR	; S=13 0100
-			.FILL ST_L		; S=14
-			.FILL ST_LD		; S=15 0010
-			.FILL ST_LE		; S=16
-			.FILL ST_LDI	; S=17 1010
-			.FILL ST_LDR	; S=18 0110
-			.FILL ST_LEA	; S=19 1110
-			.FILL ST_N		; S=20
-			.FILL ST_NO		; S=21
-			.FILL ST_NOT	; S=22 1001
-			.FILL ST_R		; S=23
-			.FILL ST_RE		; S=24
-			.FILL ST_RT		; S=25
-			.FILL ST_RET	; S=26 1100
-			.FILL ST_RTI	; S=27 1000
-			.FILL ST_S		; S=28
-			.FILL ST_ST		; S=29 0011
-			.FILL ST_STI	; S=30 1011
-			.FILL ST_STR	; S=31 0111
-			.FILL ST_T		; S=32
-			.FILL ST_TR		; S=33
-			.FILL ST_TRA	; S=34
-			.FILL ST_TRAP	; S=35 1111
-			.FILL ST_Q		; S=36
-			.FILL ST_QU		; S=37
-			.FILL ST_QUI	; S=38
-			.FILL ST_QUIT	; 3=39
-			.FILL ST_FAIL	; S=40
 		
-; States
+; states begin
+
+; state template
+; [STATE_NAME]
+;		R6 = return_loc
+;
+;		l1 = input()
+;
+;		l2 = load_letter()
+;		if L1 == L2:
+;			advance_state(dest_state - this_state)
+;		
+;		l2 = load_letter()
+;		elif L1 == L2:
+;			advance_state(dest_state - this_state)
+;
+;		# ... check each letter for the tree, ex A -> AN,AD so N,D
+;
+;		L2 = load_letter('\n')
+;		elif L1 == L2:
+;			fail()
+;			restart()
+;		
+;		else:
+;			advance_state(fail_state - this_state)
+;
+;		return
+
 ST_INIT
 		ADD R6 R7 #0
 		
@@ -283,52 +315,52 @@ ST_INIT
 		LDR R4 R3 #0 ; A
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_A(1-0)
+			ADD R1 R1 #1 ; ST_A(1-0)
 			
 		LDR R4 R3 #1 ; B
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #6	; ST_B(6-0)
+			ADD R1 R1 #6 ; ST_B(6-0)
 			
 		LDR R4 R3 #9 ; J
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #8	; ST_J(8-0)
+			ADD R1 R1 #8 ; ST_J(8-0)
 			
 		LDR R4 R3 #11 ; L
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #14	; ST_L(14-0)
+			ADD R1 R1 #14 ; ST_L(14-0)
 			
 		LDR R4 R3 #13
 		JSR EQUALS
 		BRnp #2
-			ADD R1 R1 #15	; ST_N(20-0)
+			ADD R1 R1 #15 ; ST_N(20-0)
 			ADD R1 R1 #5
 			
 		LDR R4 R3 #16 ; Q
 		JSR EQUALS
 		BRnp #3
-			ADD R1 R1 #15	; ST_S(36-0)
+			ADD R1 R1 #15 ; ST_S(36-0)
 			ADD R1 R1 #15
 			ADD R1 R1 #6
 			
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #2
-			ADD R1 R1 #15	; ST_R(23-0)
+			ADD R1 R1 #15 ; ST_R(23-0)
 			ADD R1 R1 #8
 			
 		LDR R4 R3 #18 ; S
 		JSR EQUALS
 		BRnp #2
-			ADD R1 R1 #15	; ST_S(28-0)
+			ADD R1 R1 #15 ; ST_S(28-0)
 			ADD R1 R1 #13
 			
 		LDR R4 R3 #19 ; T
 		JSR EQUALS
 		BRnp #3
-			ADD R1 R1 #15	; ST_S(32-0)
+			ADD R1 R1 #15 ; ST_S(32-0)
 			ADD R1 R1 #15
 			ADD R1 R1 #2
 			
@@ -338,13 +370,13 @@ ST_INIT
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else R4=0
+		AND R4 R4 #0 ; else R4=0
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #10	; ST_FAIL
+			ADD R1 R1 #10 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -357,12 +389,12 @@ ST_A
 		LDR R4 R3 #3 ; D
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_AD(2-1)
+			ADD R1 R1 #1 ; ST_AD(2-1)
 			
 		LDR R4 R3 #13 ; N
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_AN(3-1)
+			ADD R1 R1 #2 ; ST_AN(3-1)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -372,14 +404,14 @@ ST_A
 		
 		ADD R7 R6 #0
 		
-		AND R4 R4 #0	; Else R4=1
+		AND R4 R4 #0 ; else R4=1
 		ADD R4 R4 #1
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #9	; ST_FAIL
+			ADD R1 R1 #9 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -392,7 +424,7 @@ ST_AD
 		LDR R4 R3 #3 ; D
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_ADD(4-2)
+			ADD R1 R1 #2 ; ST_ADD(4-2)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -400,14 +432,14 @@ ST_AD
 			JSR FAIL
 			JSR START
 		
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #2
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #8	; ST_FAIL
+			ADD R1 R1 #8 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -420,7 +452,7 @@ ST_AN
 		LDR R4 R3 #3 ; D
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_AND(5-3)
+			ADD R1 R1 #2 ; ST_AND(5-3)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -428,14 +460,14 @@ ST_AN
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #3
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #7	; ST_FAIL
+			ADD R1 R1 #7 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -453,14 +485,14 @@ ST_ADD ; --------------
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #4
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #6	; ST_FAIL
+			ADD R1 R1 #6 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -478,14 +510,14 @@ ST_AND ; --------------
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #5
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #5	; ST_FAIL
+			ADD R1 R1 #5 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -498,7 +530,7 @@ ST_B
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_BR(7-6)
+			ADD R1 R1 #1 ; ST_BR(7-6)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -506,14 +538,14 @@ ST_B
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #6
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #4	; ST_FAIL
+			ADD R1 R1 #4 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -531,14 +563,14 @@ ST_BR
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #7
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #3	; ST_FAIL
+			ADD R1 R1 #3 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -551,12 +583,12 @@ ST_J
 		LDR R4 R3 #12 ; M
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_JM(9-8)
+			ADD R1 R1 #1 ; ST_JM(9-8)
 			
 		LDR R4 R3 #18 ; S
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_JS(10-8)
+			ADD R1 R1 #2 ; ST_JS(10-8)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -564,14 +596,14 @@ ST_J
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #8
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #2	; ST_FAIL
+			ADD R1 R1 #2 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -584,7 +616,7 @@ ST_JM
 		LDR R4 R3 #15 ; P
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_JMP(11-9)
+			ADD R1 R1 #2 ; ST_JMP(11-9)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -592,14 +624,14 @@ ST_JM
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #9
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
 			ADD R1 R1 #15
-			ADD R1 R1 #1	; ST_FAIL
+			ADD R1 R1 #1 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -612,7 +644,7 @@ ST_JS
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_JSR(12-10)
+			ADD R1 R1 #2 ; ST_JSR(12-10)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -620,13 +652,13 @@ ST_JS
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #10
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #15	; ST_FAIL
+			ADD R1 R1 #15 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -644,13 +676,13 @@ ST_JMP
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #11
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #14	; ST_FAIL
+			ADD R1 R1 #14 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -663,7 +695,7 @@ ST_JSR
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_JSRR(13-12)
+			ADD R1 R1 #1 ; ST_JSRR(13-12)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -673,13 +705,13 @@ ST_JSR
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #12
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #13	; ST_FAIL
+			ADD R1 R1 #13 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -697,13 +729,13 @@ ST_JSRR
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #13
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #12	; ST_FAIL
+			ADD R1 R1 #12 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -715,12 +747,12 @@ ST_L
 		LDR R4 R3 #3 ; D
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_LD(15-14)
+			ADD R1 R1 #1 ; ST_LD(15-14)
 			
 		LDR R4 R3 #4 ; E
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_LE(16-14)
+			ADD R1 R1 #2 ; ST_LE(16-14)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -728,13 +760,13 @@ ST_L
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #14
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #11	; ST_FAIL
+			ADD R1 R1 #11 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -747,12 +779,12 @@ ST_LD
 		LDR R4 R3 #8 ; I
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_LDI(17-15)
+			ADD R1 R1 #2 ; ST_LDI(17-15)
 			
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #3	; ST_LDR(18-15)
+			ADD R1 R1 #3 ; ST_LDR(18-15)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -762,13 +794,13 @@ ST_LD
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #10	; ST_FAIL
+			ADD R1 R1 #10 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -781,7 +813,7 @@ ST_LE
 		LDR R4 R3 #0 ; A
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #3	; ST_LEA(19-16)
+			ADD R1 R1 #3 ; ST_LEA(19-16)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -789,14 +821,14 @@ ST_LE
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #1
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #9	; ST_FAIL
+			ADD R1 R1 #9 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -814,14 +846,14 @@ ST_LDI
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #2
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #8	; ST_FAIL
+			ADD R1 R1 #8 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -839,14 +871,14 @@ ST_LDR
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #3
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #7	; ST_FAIL
+			ADD R1 R1 #7 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -864,14 +896,14 @@ ST_LEA
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #4
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #6	; ST_FAIL
+			ADD R1 R1 #6 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -884,7 +916,7 @@ ST_N
 		LDR R4 R3 #14 ; O
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_NO(21-20)
+			ADD R1 R1 #1 ; ST_NO(21-20)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -892,14 +924,14 @@ ST_N
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #5
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #5	; ST_FAIL
+			ADD R1 R1 #5 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -912,7 +944,7 @@ ST_NO
 		LDR R4 R3 #19 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_NOT(22-21)
+			ADD R1 R1 #1 ; ST_NOT(22-21)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -920,14 +952,14 @@ ST_NO
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #6
 		ADD R0 R1 #0
 		JSR EQUALS
 		BRnp #1
 			ADD R1 R1 #15
-			ADD R1 R1 #4	; ST_FAIL
+			ADD R1 R1 #4 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -945,13 +977,13 @@ ST_NOT
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #7
 		JSR EQUALS
 		BRnp #2
 			ADD R1 R1 #15
-			ADD R1 R1 #3	; ST_FAIL
+			ADD R1 R1 #3 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -964,12 +996,12 @@ ST_R
 		LDR R4 R3 #4 ; E
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_RE(24-23)
+			ADD R1 R1 #1 ; ST_RE(24-23)
 			
 		LDR R4 R3 #19 ; T
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_RT(27-25)
+			ADD R1 R1 #2 ; ST_RT(27-25)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -977,13 +1009,13 @@ ST_R
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #8
 		JSR EQUALS
 		BRnp #1
 			ADD R1 R1 #15
-			ADD R1 R1 #2	; ST_FAIL
+			ADD R1 R1 #2 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -996,7 +1028,7 @@ ST_RE
 		LDR R4 R3 #19 ; T
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_RET(26-25)
+			ADD R1 R1 #2 ; ST_RET(26-25)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1004,13 +1036,13 @@ ST_RE
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #9
 		JSR EQUALS
 		BRnp #1
 			ADD R1 R1 #15
-			ADD R1 R1 #1	; ST_FAIL
+			ADD R1 R1 #1 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1023,7 +1055,7 @@ ST_RT
 		LDR R4 R3 #8 ; I
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_RTI(27-25)
+			ADD R1 R1 #2 ; ST_RTI(27-25)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1031,12 +1063,12 @@ ST_RT
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #10
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #15	; ST_FAIL
+			ADD R1 R1 #15 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1054,12 +1086,12 @@ ST_RET
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #11
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #14	; ST_FAIL
+			ADD R1 R1 #14 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -1077,12 +1109,12 @@ ST_RTI
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #12
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #13	; ST_FAIL
+			ADD R1 R1 #13 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -1095,7 +1127,7 @@ ST_S
 		LDR R4 R3 #19 ; T
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_ST(29-28)
+			ADD R1 R1 #1 ; ST_ST(29-28)
 		
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1103,12 +1135,12 @@ ST_S
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #13
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #12	; ST_FAIL
+			ADD R1 R1 #12 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1121,12 +1153,12 @@ ST_ST
 		LDR R4 R3 #8 ; I
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_STI(30-29)
+			ADD R1 R1 #1 ; ST_STI(30-29)
 			
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_STR(31-29)
+			ADD R1 R1 #2 ; ST_STR(31-29)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1136,12 +1168,12 @@ ST_ST
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #14
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #11	; ST_FAIL
+			ADD R1 R1 #11 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1159,12 +1191,12 @@ ST_STI
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #10	; ST_FAIL
+			ADD R1 R1 #10 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -1182,13 +1214,13 @@ ST_STR
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #1
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #9	; ST_FAIL
+			ADD R1 R1 #9 ; ST_FAIL
 			
 		ADD R7 R6 #0
 		RET
@@ -1201,7 +1233,7 @@ ST_T
 		LDR R4 R3 #17 ; R
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_TR(33-32)
+			ADD R1 R1 #1 ; ST_TR(33-32)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1209,13 +1241,13 @@ ST_T
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #2
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #8	; ST_FAIL
+			ADD R1 R1 #8 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1228,7 +1260,7 @@ ST_TR
 		LDR R4 R3 #0 ; A
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_TRA(34-33)
+			ADD R1 R1 #1 ; ST_TRA(34-33)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1236,13 +1268,13 @@ ST_TR
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #3
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #7	; ST_FAIL
+			ADD R1 R1 #7 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1255,7 +1287,7 @@ ST_TRA
 		LDR R4 R3 #15 ; P
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_TRAP(35-34)
+			ADD R1 R1 #1 ; ST_TRAP(35-34)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1263,13 +1295,13 @@ ST_TRA
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #4
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #6	; ST_FAIL
+			ADD R1 R1 #6 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1287,13 +1319,13 @@ ST_TRAP
 			JSR PRINT
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #5
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #5	; ST_FAIL
+			ADD R1 R1 #5 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1306,7 +1338,7 @@ ST_Q
 		LDR R4 R3 #20 ; U
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_QU(37-36)
+			ADD R1 R1 #1 ; ST_QU(37-36)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1314,13 +1346,13 @@ ST_Q
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #2
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #4	; ST_FAIL
+			ADD R1 R1 #4 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1333,7 +1365,7 @@ ST_QU
 		LDR R4 R3 #8 ; I
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_QUI(38-37)
+			ADD R1 R1 #1 ; ST_QUI(38-37)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1341,13 +1373,13 @@ ST_QU
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #3
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #3	; ST_FAIL
+			ADD R1 R1 #3 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1360,7 +1392,7 @@ ST_QUI
 		LDR R4 R3 #19 ; T
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #1	; ST_QUIT(39-38)
+			ADD R1 R1 #1 ; ST_QUIT(39-38)
 			
 		LDR R4 R3 #26 ; \n
 		JSR EQUALS
@@ -1368,13 +1400,13 @@ ST_QUI
 			JSR FAIL
 			JSR START
 			
-		AND R4 R4 #0	; Else
+		AND R4 R4 #0 ; else
 		ADD R4 R4 #15
 		ADD R4 R4 #15
 		ADD R4 R4 #4
 		JSR EQUALS
 		BRnp #1
-			ADD R1 R1 #2	; ST_FAIL
+			ADD R1 R1 #2 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1389,7 +1421,7 @@ ST_QUIT
 		BRnp #1
 			HALT
 			
-		ADD R1 R1 #1	; ST_FAIL
+		ADD R1 R1 #1 ; ST_FAIL
 		
 		ADD R7 R6 #0
 		RET
@@ -1408,4 +1440,4 @@ ST_FAIL
 		ADD R7 R6 #0
 		RET
 
-		.END
+.END
