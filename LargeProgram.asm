@@ -9,90 +9,15 @@
 ; loop back to the top
 
 .ORIG x9000 ; ascii table
-	.FILL x41 ; A
-	.FILL x42 ; B
-	.FILL x43 ; C
-	.FILL x44 ; D
-	.FILL x45 ; E
-	.FILL x46 ; F
-	.FILL x47 ; G
-	.FILL x48 ; H
-	.FILL x49 ; I
-	.FILL x4A ; J
-	.FILL x4B ; K
-	.FILL x4C ; L
-	.FILL x4D ; M
-	.FILL x4E ; N
-	.FILL x4F ; O
-	.FILL x50 ; P
-	.FILL x51 ; Q
-	.FILL x52 ; R
-	.FILL x53 ; S
-	.FILL x54 ; T
-	.FILL x55 ; U
-	.FILL x56 ; V
-	.FILL x57 ; W
-	.FILL x58 ; X
-	.FILL x59 ; Y
-	.FILL x5A ; Z
-	.FILL xA ; \n
-	.FILL x20 ; [SPACE]
-	.FILL x3A ; :
+.STRINGZ "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n :"
 .END
 
 .ORIG x9500 ; command prompt, x3A(:) terminated
-	.FILL x45 ; E
-	.FILL x6E ; n
-	.FILL x74 ; t
-	.FILL x65 ; e
-	.FILL x72 ; r
-	.FILL x20 ;  
-	.FILL x4C ; L
-	.FILL x43 ; C
-	.FILL x33 ; 3
-	.FILL x20 ;  
-	.FILL x49 ; I
-	.FILL x6E ; n
-	.FILL x73 ; s
-	.FILL x74 ; t
-	.FILL x72 ; r
-	.FILL x75 ; u
-	.FILL x63 ; c
-	.FILL x74 ; t
-	.FILL x69 ; i
-	.FILL x6F ; o
-	.FILL x6E ; n
-	.FILL x3A ; :
+.STRINGZ "Enter LC3 Instruction:"
 .END
 
 .ORIG x9600 ; error message, x0A(\n) terminated
-	.FILL x45 ; E
-	.FILL x52 ; R
-	.FILL x52 ; R
-	.FILL x4F ; O
-	.FILL x52 ; R
-	.FILL x2C ; ,
-	.FILL x20 ;  
-	.FILL x49 ; I
-	.FILL x4E ; N
-	.FILL x56 ; V
-	.FILL x41 ; A
-	.FILL x4C ; L
-	.FILL x49 ; I
-	.FILL x44 ; D
-	.FILL x20 ;  
-	.FILL x49 ; I
-	.FILL x4E ; N
-	.FILL x53 ; S
-	.FILL x54 ; T
-	.FILL x52 ; R
-	.FILL x55 ; U
-	.FILL x43 ; C
-	.FILL x54 ; T
-	.FILL x49 ; I
-	.FILL x4F ; O
-	.FILL x4E ; N
-	.FILL xA ; \n
+.STRINGZ "ERROR, INVALID INSTRUCTION\n"
 .END
 
 .ORIG x3000
@@ -167,9 +92,9 @@ EQUALS	NOT R4 R4
 		RET
 
 ; func(reserved: R3) -> NULL
-; changes: R0, R4, R5, R6, R7, CC
+; changes: R0, R4, R5, R7, CC
 ; echos instruction prompt to console
-PROMPT	ADD R6 R7 #0
+PROMPT	ST R7 PROMPT_RET
 		LD R5 PROMPT_LOC
 			LDR R0 R5 #0
 			TRAP x21
@@ -179,13 +104,14 @@ PROMPT	ADD R6 R7 #0
 			BRnp #-6
 		LDR R0 R3 #27 ; _
 		TRAP x21
-		ADD R7 R6 #0
+		LD R7 PROMPT_RET
 		RET
+PROMPT_RET .FILL #0
 		
 ; func(reserved: R3) -> NULL
-; changes: R0, R4, R5, R6, R7, CC
+; changes: R0, R4, R5, R7, CC
 ; echos error message to console
-FAIL 	ADD R6 R7 #0
+FAIL 	ST R7 FAIL_RET
 		LD R5 ERROR_LOC
 			LDR R0 R5 #0
 			TRAP x21
@@ -193,18 +119,19 @@ FAIL 	ADD R6 R7 #0
 			ADD R5 R5 #1
 			JSR EQUALS
 			BRnp #-6
-		ADD R7 R6 #0
+		LD R7 FAIL_RET
 		RET
+FAIL_RET .FILL #0
 		
 ; func(reserved: R5) -> NULL
-; changes: R0, R2, R3, R5, R7, CC
+; changes: R0, R3, R5, R7, CC
 ; echos the 4 rightmost bits of R5 to the console
-PRINT	ADD R2 R7 #0
+PRINT	ST R7 PRINT_RET
 
 		NOT R5 R5
 
 		AND R3 R3 #0
-		ADD R3 R3 #8 ; bitmask
+		ADD R3 R3 #8 ; bitmask 1000
 		AND R0 R5 R3
 		BRz #2 
 			AND R0 R0 #0
@@ -216,7 +143,7 @@ PRINT	ADD R2 R7 #0
 		TRAP x21
 		
 		AND R3 R3 #0
-		ADD R3 R3 #4 ; bitmask
+		ADD R3 R3 #4 ; bitmask 0100
 		AND R0 R5 R3
 		BRz #2 
 			AND R0 R0 #0
@@ -228,7 +155,7 @@ PRINT	ADD R2 R7 #0
 		TRAP x21
 		
 		AND R3 R3 #0
-		ADD R3 R3 #2 ; bitmask
+		ADD R3 R3 #2 ; bitmask 0010
 		AND R0 R5 R3
 		BRz #2 
 			AND R0 R0 #0
@@ -240,7 +167,7 @@ PRINT	ADD R2 R7 #0
 		TRAP x21
 		
 		AND R3 R3 #0
-		ADD R3 R3 #1 ; bitmask
+		ADD R3 R3 #1 ; bitmask 0001
 		AND R0 R5 R3
 		BRz #2 
 			AND R0 R0 #0
@@ -255,13 +182,14 @@ PRINT	ADD R2 R7 #0
 		LDR R0 R3 #26 ; \n
 		TRAP x21
 
-		ADD R7 R2 #0
+		LD R7 PRINT_RET
 		RET
+PRINT_RET .FILL #0
 
 ; func() -> R0
-; changes: R0, R4, R5, R7, CC
+; changes: R0, R5, R7, CC
 ; gets a character from the console and makes it uppercase, stores character in R0
-INPUT	ADD R4 R7 #0
+INPUT	ST R7 INPUT_RET
 		TRAP x20
 		TRAP x21
 		ADD R5 R0 #0
@@ -276,8 +204,9 @@ INPUT	ADD R4 R7 #0
 			ADD R0 R0 #-15
 			ADD R0 R0 #-15
 			ADD R0 R0 #-2
-		ADD R7 R4 #0
+		LD R7 INPUT_RET
 		RET
+INPUT_RET .FILL #0
 		
 ; states begin
 
