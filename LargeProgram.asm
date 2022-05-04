@@ -8,18 +8,6 @@
 ;    no:  display an error
 ; loop back to the top
 
-.ORIG x9000 ; ascii table
-.STRINGZ "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n :"
-.END
-
-.ORIG x9500 ; command prompt, x3A(:) terminated
-.STRINGZ "Enter LC3 Instruction:"
-.END
-
-.ORIG x9600 ; error message, x0A(\n) terminated
-.STRINGZ "ERROR, INVALID INSTRUCTION\n"
-.END
-
 .ORIG x3000
 
 ; program start
@@ -471,7 +459,7 @@ ST_B
 		ADD R4 R4 #6
 		ADD R0 R1 #0
 		JSR EQUALS
-		BRnp #2
+		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
 			ADD R1 R1 #4 ; ST_FAIL
@@ -488,7 +476,7 @@ ST_BR
 		JSR EQUALS
 		BRnp #4
 			AND R5 R5 #0
-			ADD R5 R5 #0
+			; ADD R5 R5 #0
 			JSR PRINT
 			JSR START
 			
@@ -496,7 +484,7 @@ ST_BR
 		ADD R4 R4 #7
 		ADD R0 R1 #0
 		JSR EQUALS
-		BRnp #2
+		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
 			ADD R1 R1 #3 ; ST_FAIL
@@ -529,7 +517,7 @@ ST_J
 		ADD R4 R4 #8
 		ADD R0 R1 #0
 		JSR EQUALS
-		BRnp #2
+		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
 			ADD R1 R1 #2 ; ST_FAIL
@@ -557,7 +545,7 @@ ST_JM
 		ADD R4 R4 #9
 		ADD R0 R1 #0
 		JSR EQUALS
-		BRnp #2
+		BRnp #3
 			ADD R1 R1 #15
 			ADD R1 R1 #15
 			ADD R1 R1 #1 ; ST_FAIL
@@ -886,7 +874,7 @@ ST_NO
 		ADD R4 R4 #6
 		ADD R0 R1 #0
 		JSR EQUALS
-		BRnp #1
+		BRnp #2
 			ADD R1 R1 #15
 			ADD R1 R1 #4 ; ST_FAIL
 		
@@ -902,7 +890,7 @@ ST_NOT
 		JSR EQUALS
 		BRnp #4
 			AND R5 R5 #0
-			ADD R5 R5 #9
+			ADD R5 R5 #9 ; 1100?
 			JSR PRINT
 			JSR START
 			
@@ -1369,4 +1357,16 @@ ST_FAIL
 		ADD R7 R6 #0
 		RET
 
+.END
+
+.ORIG x9000 ; ascii table
+.STRINGZ "ABCDEFGHIJKLMNOPQRSTUVWXYZ\n :"
+.END
+
+.ORIG x9500 ; command prompt, x3A(:) terminated
+.STRINGZ "Enter LC3 Instruction:"
+.END
+
+.ORIG x9600 ; error message, x0A(\n) terminated
+.STRINGZ "ERROR, INVALID INSTRUCTION\n"
 .END
