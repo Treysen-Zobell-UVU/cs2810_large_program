@@ -1,5 +1,5 @@
 
-; Prompt user to input and LC-3 command
+; Prompt user to input a LC-3 command
 ; Take input, input ends when enter/return is encountered
 ; Check if input is "QUIT"
 ;    yes: exit
